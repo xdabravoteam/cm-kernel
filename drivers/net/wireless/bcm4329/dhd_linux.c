@@ -507,7 +507,7 @@ int dhd_set_suspend(int value, dhd_pub_t *dhd)
 
 #define htod32(i) i
 
-	if (dhd && dhd->up) {
+	if (dhd && (dhd->up && !dhd->suspend_disable_flag)) {
 		dhd_os_proto_block(dhd);
 		if (value) {
 
@@ -1764,11 +1764,13 @@ dhd_ioctl_entry(struct net_device *net, struct ifreq *ifr, int cmd)
 
 	bcmerror = dhd_prot_ioctl(&dhd->pub, ifidx, (wl_ioctl_t *)&ioc, buf, buflen);
 
-	if (bcmerror == -ETIMEDOUT) {
+done:
+	if ((bcmerror == -ETIMEDOUT) || ((dhd->pub.busstate == DHD_BUS_DOWN) &&
+			(!dhd->pub.dongle_reset))) {
 		DHD_ERROR(("%s: Event HANG send up\n", __FUNCTION__));
 		wl_iw_send_priv_event(net, "HANG");
 	}
-done:
+
 	if (!bcmerror && buf && ioc.buf) {
 		if (copy_to_user(ioc.buf, buf, buflen))
 			bcmerror = -EFAULT;
@@ -3020,4 +3022,13 @@ int net_os_wake_unlock(struct net_device *dev)
 	if (dhd)
 		ret = dhd_os_wake_unlock(&dhd->pub);
 	return ret;
+}
+
+int net_os_set_suspend_disable(struct net_device *dev, int val)
+{
+	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
+
+	if (dhd)
+		dhd->pub.suspend_disable_flag = val;
+	return 0;
 }
