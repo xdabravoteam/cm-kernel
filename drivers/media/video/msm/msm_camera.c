@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <mach/board.h>
 
+#include <linux/dma-mapping.h>
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/uaccess.h>
@@ -241,6 +242,10 @@ static int msm_pmem_table_add(struct hlist_head *ptype,
 	region->file = file;
 	memcpy(&region->info, info, sizeof(region->info));
 
+	if (info->vfe_can_write) {
+		dmac_map_area((void*)region->kvaddr, region->len, DMA_FROM_DEVICE);
+	}
+
 	hlist_add_head(&(region->list), ptype);
 
 	return 0;
@@ -286,6 +291,8 @@ static int msm_pmem_frame_ptov_lookup(struct msm_sync *sync,
 						region->info.cbcr_off) &&
 				region->info.vfe_can_write) {
 			*pmem_region = region;
+			dmac_unmap_area((void*)region->kvaddr, region->len,
+					DMA_FROM_DEVICE);
 			region->info.vfe_can_write = !take_from_vfe;
 			return 0;
 		}
@@ -305,6 +312,8 @@ static unsigned long msm_pmem_stats_ptov_lookup(struct msm_sync *sync,
 			/* offset since we could pass vaddr inside a
 			 * registered pmem buffer */
 			*fd = region->info.fd;
+			dmac_unmap_area((void*)region->kvaddr, region->len,
+					DMA_FROM_DEVICE);
 			region->info.vfe_can_write = 0;
 			return (unsigned long)(region->info.vaddr);
 		}
@@ -327,6 +336,7 @@ static unsigned long msm_pmem_frame_vtop_lookup(struct msm_sync *sync,
 				(region->info.cbcr_off == cbcroff) &&
 				(region->info.fd == fd) &&
 				(region->info.vfe_can_write == 0)) {
+			dmac_map_area((void*)region->kvaddr, region->len, DMA_FROM_DEVICE);
 			region->info.vfe_can_write = 1;
 			return region->paddr;
 		}
@@ -347,6 +357,7 @@ static unsigned long msm_pmem_stats_vtop_lookup(
 		if (((unsigned long)(region->info.vaddr) == buffer) &&
 				(region->info.fd == fd) &&
 				region->info.vfe_can_write == 0) {
+			dmac_map_area((void*)region->kvaddr, region->len, DMA_FROM_DEVICE);
 			region->info.vfe_can_write = 1;
 			return region->paddr;
 		}
@@ -376,6 +387,10 @@ static int __msm_pmem_table_del(struct msm_sync *sync,
 					pinfo->fd == region->info.fd) {
 				hlist_del(node);
 				put_pmem_file(region->file);
+				if (region->info.vfe_can_write) {
+					dmac_unmap_area((void*)region->kvaddr, region->len,
+							DMA_FROM_DEVICE);
+				}
 				kfree(region);
 			}
 		}
@@ -391,6 +406,10 @@ static int __msm_pmem_table_del(struct msm_sync *sync,
 					pinfo->fd == region->info.fd) {
 				hlist_del(node);
 				put_pmem_file(region->file);
+				if (region->info.vfe_can_write) {
+					dmac_unmap_area((void*)region->kvaddr, region->len,
+							DMA_FROM_DEVICE);
+				}
 				kfree(region);
 			}
 		}
@@ -1511,8 +1530,9 @@ static int msm_get_pic(struct msm_sync *sync, void __user *arg)
 		__func__,
 		pic_pmem_region.kvaddr, end);
 
-	dmac_flush_range((const void *)pic_pmem_region.kvaddr,
-			(const void *)end);
+	/* HACK: Invalidate buffer */
+	dmac_map_area((void*)pic_pmem_region.kvaddr, pic_pmem_region.len,
+			DMA_FROM_DEVICE);
 
 	CDBG("%s: copy snapshot frame to user\n", __func__);
 	if (copy_to_user((void *)arg,
