@@ -55,8 +55,8 @@
 #include "devices.h"
 #include "proc_comm.h"
 
-#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
-#include <linux/crucialtec_oj.h>
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+#include <linux/curcial_oj.h>
 #endif
 
 static uint debug_uart;
@@ -314,14 +314,6 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.cached		= 1,
 };
 
-static struct android_pmem_platform_data android_pmem_camera_pdata = {
-	.name		= "pmem_camera",
-	.start		= MSM_PMEM_CAMERA_BASE,
-	.size		= MSM_PMEM_CAMERA_SIZE,
-	.no_allocator	= 1,
-	.cached		= 1,
-};
-
 static struct android_pmem_platform_data android_pmem_venc_pdata = {
         .name           = "pmem_venc",
         .start          = MSM_PMEM_VENC_BASE,
@@ -343,14 +335,6 @@ static struct platform_device android_pmem_adsp_device = {
 	.id		= 1,
 	.dev		= {
 		.platform_data = &android_pmem_adsp_pdata,
-	},
-};
-
-static struct platform_device android_pmem_camera_device = {
-	.name		= "android_pmem",
-	.id		= 2,
-	.dev		= {
-		.platform_data = &android_pmem_camera_pdata,
 	},
 };
 
@@ -767,9 +751,8 @@ static int __init ds2784_battery_init(void)
 	return w1_register_family(&w1_ds2784_family);
 }
 
-#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
-/* <3 HTC
-static void crucialtec_oj_shutdown(int enable)
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
+static void curcial_oj_shutdown(int enable)
 {
 	uint8_t cmd[3];
 	memset(cmd, 0x00, sizeof(uint8_t)*3);
@@ -779,9 +762,9 @@ static void crucialtec_oj_shutdown(int enable)
 //	pr_err("%s\n", __func__);	
 	printk("%s\n", __func__);	
 }
-*/
 
-static void crucialtec_oj_shutdown(int enable)
+/* <3 HTC
+static void curcial_oj_shutdown(int enable)
 {
 	uint8_t cmd[3];
 	memset(cmd, 0, sizeof(uint8_t)*3);
@@ -793,10 +776,12 @@ static void crucialtec_oj_shutdown(int enable)
 	else
 		microp_i2c_write(0x90, cmd, 3);
 }
+*/
 
-static int crucialtec_oj_poweron(int on)
+static int curcial_oj_poweron(int on)
 {
 	uint8_t data[2];
+	uint16_t a, b;
 	struct vreg *oj_power = vreg_get(0, "gp2");
 	if (IS_ERR(oj_power)) {
 //		pr_err("%s: Error power domain\n", __func__);
@@ -807,23 +792,25 @@ static int crucialtec_oj_poweron(int on)
 	if (on) {
 		vreg_set_level(oj_power, 2750);
 		vreg_enable(oj_power);
-//		pr_err("%s: OJ power enable(%d)\n", __func__, on);
-		printk("%s: OJ power enable(%d)\n", __func__, on);
 	} else {
-	/* for microp firmware(v04) setting*/
-/*		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
+		/* for microp firmware(v04) setting*/
+		microp_i2c_read(MICROP_I2C_RCMD_VERSION, data, 2);
 		if (data[0] < 4) {
 			printk("Microp firmware version: %d\n", data[0]);
+//			a = MSM_GPIO_TO_INT(12);
+//			b = MSM_uP_TO_INT(12);
+//			printk("MSM_GPIO_TO_INT(12) = %d MSM_uP_TO_INT(12) = %d\n", a, b);
 			return 1;
-		}*/
+		}
 		vreg_disable(oj_power);
-//		pr_err("%s: OJ power enable(%d)\n", __func__, on);
-		printk("%s: OJ power enable(%d)\n", __func__, on);
 	}
+
+//	pr_err("%s: OJ power enable(%d)\n", __func__, on);
+	printk("%s: OJ power enable(%d)\n", __func__, on);
 	return 1;
 }
 
-static void crucialtec_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
+static void curcial_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t *mSumDeltaY)
 {
 	int8_t 	deltaX;
 	int8_t 	deltaY;
@@ -844,36 +831,35 @@ static void crucialtec_oj_adjust_xy(uint8_t *data, int16_t *mSumDeltaX, int16_t 
 }
 
 #define BRAVO_MICROP_VER	0x03
-static struct crucialtec_oj_platform_data bravo_oj_data = {
-	.oj_poweron = crucialtec_oj_poweron,
-	.oj_shutdown = crucialtec_oj_shutdown,
-	.oj_adjust_xy = crucialtec_oj_adjust_xy,
+static struct curcial_oj_platform_data bravo_oj_data = {
+	.oj_poweron = curcial_oj_poweron,
+	.oj_shutdown = curcial_oj_shutdown,
+	.oj_adjust_xy = curcial_oj_adjust_xy,
 	.microp_version = BRAVO_MICROP_VER,
-	.mdelay_time = 0,
-	.msleep_time = 1,
-	.x_send_count = 4,
-	.y_send_count = 2,
-	.fast_th = 1,
-	.normal_th = 8,
-	.continue_th = 3,
-	.continue_max = 0,
-	.xy_ratio = 15,
-	.interval = 200,
-	.softclick = 0,
-	.swap = 0,
-	.x = 1,
-	.y = -1,
-	.share_power = false,
+        .debugflag = 0,
+        .mdelay_time = 0,
+        .normal_th = 8,
+        .xy_ratio = 15,
+        .interval = 20,
+        .swap           = false,
+        .ap_code = false,
+        .x              = 1,
+        .y              = 1,
+        .share_power    = false,
 	.Xsteps = {2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 		2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 		2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
 	.Ysteps = {2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 		2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
 		2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+	.sht_tbl = {0, 2000, 2250, 2500, 2750, 3000},
+	.pxsum_tbl = {0, 0, 40, 50, 60, 70},
+	.degree = 6,
+	.irq = MSM_uP_TO_INT(12),
 };
 
 static struct platform_device bravo_oj = {
-	.name = CRUCIALTEC_OJ_NAME,
+	.name = CURCIAL_OJ_NAME,
 	.id = -1,
 	.dev = {
 		.platform_data = &bravo_oj_data,
@@ -899,7 +885,6 @@ static struct platform_device *devices[] __initdata = {
 	&android_usb_device,
 	&android_pmem_mdp_device,
 	&android_pmem_adsp_device,
-	&android_pmem_camera_device,
 #ifdef CONFIG_720P_CAMERA
         &android_pmem_venc_device,
 #endif
@@ -907,7 +892,7 @@ static struct platform_device *devices[] __initdata = {
 	&msm_device_i2c,
 	&msm_camera_sensor_s5k3e2fx,
 	&bravo_flashlight_device,
-#ifdef CONFIG_INPUT_CRUCIALTEC_OJ
+#ifdef CONFIG_OPTICALJOYSTICK_CRUCIAL
 	&bravo_oj,
 #endif
 	&capella_cm3602,
@@ -1030,11 +1015,6 @@ static void __init bravo_init(void)
 
 	printk("bravo_init() revision=%d\n", system_rev);
 
-	if (system_rev >= 2) {
-		mdp_pmem_pdata.start = MSM_PMEM_MDP_BASE + MSM_MEM_128MB_OFFSET;
-		android_pmem_adsp_pdata.start = MSM_PMEM_ADSP_BASE + MSM_MEM_128MB_OFFSET;
-	}
-
 	msm_hw_reset_hook = bravo_reset;
 
 	msm_acpu_clock_init(&bravo_clock_data);
@@ -1087,28 +1067,13 @@ static void __init bravo_init(void)
 static void __init bravo_fixup(struct machine_desc *desc, struct tag *tags,
 				 char **cmdline, struct meminfo *mi)
 {
-	int bravo_system_rev = 0, find = 0;
-	struct tag *t = (struct tag *)tags;
-
-	for (; t->hdr.size; t = tag_next(t)) {
-		if (t->hdr.tag == ATAG_REVISION) {
-			find = 1;
-			break;
-		}
-	}
-	if (find)
-		bravo_system_rev = t->u.revision.rev;
-
 	mi->nr_banks = 2;
-	mi->bank[0].start = MSM_EBI1_BANK0_BASE;
-	mi->bank[0].node = PHYS_TO_NID(MSM_EBI1_BANK0_BASE);
-	mi->bank[0].size = MSM_EBI1_BANK0_SIZE;
-	mi->bank[1].start = MSM_EBI1_BANK1_BASE;
-	mi->bank[1].node = PHYS_TO_NID(MSM_EBI1_BANK1_BASE);
-	mi->bank[1].size = MSM_EBI1_BANK1_SIZE;
-	if (bravo_system_rev >= 2) {
-		mi->bank[1].size = MSM_EBI1_BANK1_SIZE + MSM_MEM_128MB_OFFSET;
-	}
+        mi->bank[0].start = PHYS_OFFSET;
+        mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
+        mi->bank[0].size = MSM_EBI1_BANK0_SIZE;
+        mi->bank[1].start = MSM_EBI1_BANK1_BASE;
+        mi->bank[1].node = PHYS_TO_NID(MSM_EBI1_BANK1_BASE);
+        mi->bank[1].size = MSM_EBI1_BANK1_SIZE;
 }
 
 static void __init bravo_map_io(void)
