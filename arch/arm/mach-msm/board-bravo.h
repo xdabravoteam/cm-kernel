@@ -49,6 +49,8 @@
 
 #define BRAVO_GPIO_PS_HOLD		25
 
+#define BRAVO_GPIO_OJ_ACTION_XB		33
+
 #define BRAVO_GPIO_UP_INT_N		35
 #define BRAVO_GPIO_UP_RESET_N		82
 #define BRAVO_GPIO_LS_EN_N		119
